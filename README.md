@@ -5,7 +5,7 @@ This project is 2019 HYU graduate project with CASS.
 
 some question & using this source.
 
-[mail](metaljsw2@naver.com) & [github](https://github.com/PineApple777)
+ask here [github](https://github.com/PineApple777)
 
 ## todolist
 
