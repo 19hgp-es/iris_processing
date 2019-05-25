@@ -18,7 +18,15 @@ Ask here [@Github](https://github.com/PineApple777)
 
 `python 3.5.x` & `python 2.7.x`
 
-#### Requirements
+### Requirements
 `torch`
 `torchvision`
 `python-opencl`
+
+### Already progressed
+- [x] Understand RGP image processing with embedded-system
+- [x] Basic studying OpenCL C programming
+
+
+
+
