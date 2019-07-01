@@ -12,10 +12,10 @@ class CustomImageDataset(Dataset):
 
         all_img_files = []
         all_labels = []
-
+        #class name = 1left, 1right, 2left....
         class_names = os.walk(self.data_set_path).__next__()[1]
         for index, class_name in enumerate(class_names):
-            
+
             label = index
             img_dir = os.path.join(self.data_set_path, class_name)
             img_files = os.walk(img_dir).__next__()[2]
@@ -25,6 +25,7 @@ class CustomImageDataset(Dataset):
                 img = Image.open(img_file)
                 if img is not None:
                     all_img_files.append(img_file)
+                    #label = index of class_name
                     all_labels.append(label)
 
         return all_img_files, all_labels, len(all_img_files), len(class_names)
@@ -57,7 +58,7 @@ class CustomConvNet(nn.Module):
         self.layer4 = self.conv_module(64, 128)
         self.layer5 = self.conv_module(128, 256)
         self.gap = self.global_avg_pool(256, num_classes)
-
+    #forward convolution
     def forward(self, x):
         out = self.layer1(x)
         out = self.layer2(out)
@@ -68,7 +69,7 @@ class CustomConvNet(nn.Module):
         out = out.view(-1, num_classes)
 
         return out
-
+    #convolution steps for each layer
     def conv_module(self, in_num, out_num):
         return nn.Sequential(
             nn.Conv2d(in_num, out_num, kernel_size=3, stride=1, padding=1),
@@ -88,16 +89,18 @@ hyper_param_epoch = 100
 hyper_param_batch = 50
 hyper_param_learning_rate = 0.001
 
+#set image feature for train image
 transforms_train = transforms.Compose([transforms.Resize((360, 80)),
                                        transforms.RandomRotation(10.),
                                        transforms.ToTensor()])
-
+#set image feature for test image
 transforms_test = transforms.Compose([transforms.Resize((360, 80)),
                                       transforms.ToTensor()])
 
+#load train images
 train_data_set = CustomImageDataset(data_set_path="./data/train", transforms=transforms_train)
 train_loader = DataLoader(train_data_set, batch_size=hyper_param_batch, shuffle=True)
-
+#load test images
 test_data_set = CustomImageDataset(data_set_path="./data/test", transforms=transforms_test)
 test_loader = DataLoader(test_data_set, batch_size=hyper_param_batch, shuffle=True)
 
@@ -106,7 +109,7 @@ if not (train_data_set.num_classes == test_data_set.num_classes):
 #    exit()
 print(train_data_set.num_classes)
 print(test_data_set.num_classes)
-
+#if cuda is available then use gpu
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 num_classes = train_data_set.num_classes
@@ -143,7 +146,7 @@ with torch.no_grad():
         images = item['image'].to(device)
         labels = item['label'].to(device)
 
-        
+
         outputs = custom_model(images)
         _, predicted = torch.max(outputs.data, 1)
         total += len(labels)
