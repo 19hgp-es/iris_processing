@@ -1,11 +1,12 @@
 import os
 from PIL import Image
-
+from torchsummary import summary
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torch import nn
 from torchvision import transforms
-
+import numpy as np
+import ctypes
 
 class CustomImageDataset(Dataset):
   def read_data_set(self):
@@ -20,7 +21,7 @@ class CustomImageDataset(Dataset):
       label = index
       img_dir = os.path.join(self.data_set_path, class_name)
       img_files = os.walk(img_dir).__next__()[2]
-      print(index, '=', class_name)
+      
       for img_file in img_files:
         img_file = os.path.join(img_dir, img_file)
         img = Image.open(img_file)
@@ -48,7 +49,7 @@ class CustomImageDataset(Dataset):
     return self.length
 
 
-class CustomConvNet(nn.Module):
+class CustomConvNet(nn.Module): 
   def __init__(self, num_classes):
     super(CustomConvNet, self).__init__()
       
@@ -57,8 +58,7 @@ class CustomConvNet(nn.Module):
     self.layer3 = self.conv_module(32, 64)
     self.layer4 = self.conv_module(64, 128)
     self.layer5 = self.conv_module(128, 256)
-    self.layer6 = self.conv_module(256, 512)
-    self.gap = self.global_avg_pool(512, num_classes)
+    self.layer6 = self.global_avg_pool(256, num_classes)
 
   def forward(self, x):
     out = self.layer1(x)
@@ -67,11 +67,9 @@ class CustomConvNet(nn.Module):
     out = self.layer4(out)
     out = self.layer5(out)
     out = self.layer6(out)
-    out = self.gap(out)
     out = out.view(-1, num_classes)
     
     return out
-
   def conv_module(self, in_num, out_num):
     return nn.Sequential(
       nn.Conv2d(in_num, out_num, kernel_size=3, stride=1, padding=1),
@@ -87,7 +85,7 @@ class CustomConvNet(nn.Module):
       nn.AdaptiveAvgPool2d((1, 1)))
 
 
-hyper_param_epoch = 200
+hyper_param_epoch = 100
 hyper_param_batch = 50
 hyper_param_learning_rate = 0.001
 
@@ -106,9 +104,6 @@ test_loader = DataLoader(test_data_set, batch_size=hyper_param_batch, shuffle=Tr
 
 if not (train_data_set.num_classes == test_data_set.num_classes):
     print("error: Numbers of class in training set and test set are not equal")
-#    exit()
-print(train_data_set.num_classes)
-print(test_data_set.num_classes)
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
@@ -118,26 +113,60 @@ custom_model = CustomConvNet(num_classes=num_classes).to(device)
 # Loss and optimizer
 criterion = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(custom_model.parameters(), lr=hyper_param_learning_rate)
-
+custom_model.train()
 for e in range(hyper_param_epoch):
   for i_batch, item in enumerate(train_loader):
     images = item['image'].to(device)
     labels = item['label'].to(device)
-    #print(i_batch)
+    
     # Forward pass
     outputs = custom_model(images)
+
     loss = criterion(outputs, labels)
     # Backward and optimize
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
     
-    #if (i_batch + 1) % hyper_param_batch == 0:
+    
     print('Epoch [{}/{}], Loss: {:.4f}'.format(e + 1, hyper_param_epoch, loss.item()))
 
 # Test the model
 custom_model.eval()  # eval mode (batchnorm uses moving mean/variance instead of mini-batch mean/variance)
-torch.save(custom_model.state_dict(), "/content/gdrive/My Drive/iris/custom_model_mmu.pth")
+
+
+
+  
+np.set_printoptions(threshold=np.inf)
+
+
+with open('/content/gdrive/My Drive/iris/param.h', 'w') as f:
+  for name, param in custom_model.named_parameters():
+    print(param.type())
+    if param.requires_grad:
+      f.write(name.replace(".","_") + str(param.data.shape).replace(", ", "][")[11:].replace(")","") + " = ")
+      f.write(str(param.data.cpu().tolist()).replace("[","{").replace("]","}"))
+      f.write(";\n")
+  for name, buf in custom_model.named_buffers():
+    print(param.type())
+    f.write(name.replace(".","_") + str(buf.data.shape).replace(", ", "][")[11:].replace(")","") + " = ")
+    f.write(str(buf.data.cpu().tolist()).replace("[","{").replace("]","}"))
+    f.write(";\n")
+    
+  ''' 
+for name, param in custom_model.named_parameters():
+    if param.requires_grad:
+      f.write(name.replace(".","_") + str(param.data.shape).replace(", ", "][")[11:].replace(")","") + " = ")
+      f.write(str(param.data.cpu().numpy()))
+      f.write(str(param.data.cpu().tolist()).replace("[","{").replace("]","}"))
+      f.write(";\n")
+  for name, buf in custom_model.named_buffers():
+    f.write(name.replace(".","_") + str(buf.data.shape).replace(", ", "][")[11:].replace(")","") + " = ")
+    f.write(str(buf.data.cpu().numpy()))
+    f.write(str(buf.data.cpu().tolist()).replace("[","{").replace("]","}"))
+    f.write(";\n")'''
+
+summary(custom_model, (1, 360, 80))
 with torch.no_grad():
   correct = 0
   total = 0
@@ -146,6 +175,7 @@ with torch.no_grad():
     labels = item['label'].to(device)
 
     outputs = custom_model(images)
+    
     _, predicted = torch.max(outputs.data, 1)
     total += len(labels)
     print('predicted : ',predicted, '\nlabels : ',labels)
